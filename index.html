@@ -83,12 +83,18 @@
             background: var(--card-bg); padding: 14px; border-radius: 18px;
             display: flex; justify-content: space-between; align-items: center;
             margin-bottom: 10px; border: 1px solid #2d3748;
+            transition: all 0.3s ease;
         }
+        .card.bought { border-color: var(--green); transform: scale(0.98); opacity: 0.9; }
+        .card.completed { border-color: var(--gray); opacity: 0.6; }
+
         .card-info h4 { margin: 0; font-size: 15px; }
         .card-info p { margin: 3px 0 0; font-size: 11px; color: var(--gray); }
+        
         .btn-upgrade, .btn-task {
             background: var(--tg-blue); color: white; border: none;
             padding: 10px 12px; border-radius: 10px; font-weight: bold; min-width: 80px;
+            transition: transform 0.1s active;
         }
         .btn-task.loading { background: #334155; cursor: wait; }
         .btn-task.completed { background: #1e293b; color: var(--gray); cursor: default; }
@@ -98,12 +104,12 @@
             display: none; flex-direction: column; justify-content: center; align-items: center;
             z-index: 10000; text-align: center; padding: 20px;
         }
-        #ban-screen h1 { color: var(--red); font-size: 40px; margin-bottom: 10px; font-weight: 900; }
+        #ban-screen h1 { color: var(--red); font-size: 32px; margin-bottom: 10px; font-weight: 900; }
 
         #admin-auth-overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,0.85);
             display: none; flex-direction: column; justify-content: center; align-items: center;
-            z-index: 1000; padding: 20px;
+            z-index: 1001; padding: 20px;
         }
         .admin-input {
             background: #1e293b; border: 1px solid var(--tg-blue); color: white;
@@ -119,7 +125,7 @@
         .btn-add { background: var(--green); }
         .btn-sub { background: var(--red); }
         .btn-set { background: var(--tg-blue); }
-        .btn-ban { background: #000; color: var(--red); grid-column: span 3; border: 1px solid var(--red); margin-top: 10px; }
+        .btn-ban-action { background: #000; color: var(--red); grid-column: span 3; border: 1px solid var(--red); margin-top: 10px; font-weight: bold; padding: 10px; border-radius: 8px; }
 
         .nav {
             position: fixed; bottom: 0; width: 100%; display: flex;
@@ -135,13 +141,17 @@
             z-index: 100; text-shadow: 0 2px 4px rgba(0,0,0,0.5);
         }
         @keyframes popUp { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-100px); } }
+        
+        .warning-text {
+            font-size: 10px; color: var(--gray); text-align: center; margin-top: 20px; padding: 0 10px; line-height: 1.4;
+        }
     </style>
 </head>
 <body>
 
 <div id="ban-screen">
-    <h1>Заблоковано!</h1>
-    <p>Вас було заблоковано за порушення правил гри!</p>
+    <h1>ДОСТУП ОБМЕЖЕНО</h1>
+    <p>Ваш акаунт було заблоковано назавжди за порушення правил імперії або спробу обману системи.</p>
 </div>
 
 <div id="admin-auth-overlay">
@@ -151,7 +161,7 @@
     <button style="background: none; border: none; color: var(--gray); margin-top: 15px;" onclick="closeAdminAuth()">Скасувати</button>
 </div>
 
-<div class="container">
+<div class="container" id="main-app-container">
     <div class="header">
         <div class="user-info">
             <div id="u-avatar" class="avatar">?</div>
@@ -193,15 +203,15 @@
 
         <div id="tab-upgrades" class="tab-content">
             <h3 style="margin: 20px 0 15px;">Магазин покращень</h3>
-            <div class="card">
+            <div class="card" id="card-auto">
                 <div class="card-info">
                     <h4>Auto-Clicker 🤖</h4>
                     <p id="auto-desc">Статус: Вимкнено</p>
                     <p>Ціна: <span id="cost-auto">1000</span></p>
                 </div>
-                <button class="btn-upgrade" onclick="buy('auto')">Level <span id="lv-auto">0</span></button>
+                <button class="btn-upgrade" onclick="buy('auto')">Lvl <span id="lv-auto">0</span></button>
             </div>
-            <div class="card">
+            <div class="card" id="card-tap">
                 <div class="card-info">
                     <h4>Сила тапу 💪</h4>
                     <p id="tap-desc">+1 за клік</p>
@@ -209,7 +219,7 @@
                 </div>
                 <button class="btn-upgrade" onclick="buy('tap')">Купити</button>
             </div>
-            <div class="card">
+            <div class="card" id="card-energy">
                 <div class="card-info">
                     <h4>Енерго-буст 🔋</h4>
                     <p>+100 до ліміту</p>
@@ -217,7 +227,7 @@
                 </div>
                 <button class="btn-upgrade" onclick="buy('energy')">Купити</button>
             </div>
-            <div class="card">
+            <div class="card" id="card-regen">
                 <div class="card-info">
                     <h4>Регенерація ⚡</h4>
                     <p>Lvl <span id="lv-regen">1</span></p>
@@ -230,6 +240,7 @@
         <div id="tab-tasks" class="tab-content">
             <h3 style="margin: 20px 0 15px;">Завдання</h3>
             <div id="task-list"></div>
+            <p class="warning-text">За відписку від ботів або каналів після отримання винагороди, система автоматично нарахує штраф у 10-кратному розмірі або накладе вічне блокування вашого акаунту без можливості відновлення.</p>
         </div>
 
         <div id="tab-profile" class="tab-content">
@@ -241,7 +252,7 @@
                 </div>
                 <div style="width:100%; display:flex; justify-content:space-between;">
                     <span style="color:var(--gray)">Game ID:</span>
-                    <span id="p-game-id" style="font-family:monospace; color:var(--gold); cursor:pointer" onclick="handleIdClick()">#---</span>
+                    <span id="p-game-id" style="font-family:monospace; color:var(--gold); cursor:pointer; font-weight:bold;" onclick="handleIdClick()">#---</span>
                 </div>
             </div>
             <div id="admin-panel" class="admin-panel">
@@ -251,8 +262,8 @@
                     <button class="btn-adm btn-add" onclick="adminOp('add')">Видача</button>
                     <button class="btn-adm btn-sub" onclick="adminOp('sub')">Мінус</button>
                     <button class="btn-adm btn-set" onclick="adminOp('set')">Вст.</button>
-                    <button class="btn-adm btn-ban" onclick="adminOp('ban')">Заблокувати акаунт</button>
                 </div>
+                <button class="btn-ban-action" onclick="adminOp('ban')">ЗАБЛОКУВАТИ КОРИСТУВАЧА</button>
             </div>
         </div>
     </div>
@@ -301,22 +312,38 @@
         taskTimers: {}
     };
 
+    let idClicks = 0;
+    let idTimer = null;
+
     function getRank(bal) {
-        if (bal < 10000) return "Новачок";
-        if (bal < 50000) return "Досвідчений";
-        if (bal < 200000) return "Магнат";
-        return "Імператор";
+        if (bal < 4000) return "Новачок";
+        if (bal < 15000) return "Досвідчений";
+        if (bal < 50000) return "Бізнесмен";
+        if (bal < 70000) return "Проф. Бізнесмен";
+        return "Власник";
+    }
+
+    function checkBan() {
+        if (state.isBanned === true || state.isBanned === "true") {
+            document.getElementById('main-app-container').style.display = 'none';
+            document.getElementById('ban-screen').style.display = 'flex';
+            return true;
+        }
+        return false;
     }
 
     function load() {
-        const data = localStorage.getItem('star_empire_final_v10');
+        const data = localStorage.getItem('star_empire_final_v11');
         if (data) {
             state = {...state, ...JSON.parse(data)};
             calculateOffline();
         }
         if (!state.gameId) state.gameId = Math.floor(100000 + Math.random() * 900000);
-        if (state.isBanned) document.getElementById('ban-screen').style.display = 'flex';
-        renderTasks();
+        
+        if (!checkBan()) {
+            renderTasks();
+            updateUI();
+        }
     }
 
     function calculateOffline() {
@@ -325,11 +352,9 @@
         const diffMs = now - state.lastTime;
         const diffSec = diffMs / 1000;
 
-        // Автономна регенерація енергії
-        const regenPerSec = state.regen / 2; // 0.5 за 1lvl на сек
+        const regenPerSec = state.regen / 2; 
         state.energy = Math.min(state.maxEnergy, state.energy + (diffSec * regenPerSec));
 
-        // Автономний автоклікер
         if (state.autoLvl > 0) {
             const interval = AUTO_INTERVALS[state.autoLvl];
             const taps = Math.floor(diffSec / interval);
@@ -338,13 +363,12 @@
     }
 
     function save() {
-        if (state.isBanned) return;
         state.lastTime = Date.now();
-        localStorage.setItem('star_empire_final_v10', JSON.stringify(state));
+        localStorage.setItem('star_empire_final_v11', JSON.stringify(state));
     }
 
     function updateUI() {
-        if (state.isBanned) return;
+        if (checkBan()) return;
         const rank = getRank(state.bal);
         document.getElementById('h-bal').innerText = Math.floor(state.bal).toLocaleString();
         document.getElementById('m-bal').innerText = Math.floor(state.bal).toLocaleString();
@@ -382,14 +406,14 @@
             const isRunning = timer && (Date.now() < timer);
 
             const div = document.createElement('div');
-            div.className = 'card';
+            div.className = `card ${isCompleted ? 'completed' : ''}`;
             div.innerHTML = `
                 <div class="card-info">
                     <h4>${task.text}</h4>
                     <p style="color:var(--gold)">+${task.reward.toLocaleString()} 💰</p>
                 </div>
                 <button id="btn-task-${task.id}" class="btn-task ${isCompleted ? 'completed' : (isRunning ? 'loading' : '')}" 
-                        onclick="handleTask(${task.id})">
+                        onclick="${isCompleted ? '' : `handleTask(${task.id})`}">
                     ${isCompleted ? '✅' : (isRunning ? '⏳...' : 'Виконати')}
                 </button>
             `;
@@ -401,24 +425,20 @@
         if (state.completedTasks.includes(id)) return;
         const task = TASKS_DATA.find(t => t.id === id);
         
-        if (state.taskTimers[id] && Date.now() < state.taskTimers[id]) {
-            tg.showAlert("Зачекайте, перевірка ще триває...");
-            return;
-        }
+        if (state.taskTimers[id] && Date.now() < state.taskTimers[id]) return;
 
-        // Відкриваємо посилання
         tg.openLink(task.link);
-
-        // Ставимо таймер на 20 секунд
         state.taskTimers[id] = Date.now() + 20000;
         renderTasks();
 
         setTimeout(() => {
             const btn = document.getElementById(`btn-task-${id}`);
-            if (btn) {
+            if (btn && !state.completedTasks.includes(id)) {
                 btn.innerText = "Забрати 💰";
                 btn.classList.remove('loading');
                 btn.onclick = () => claimTask(id);
+                // Анімація готовності
+                btn.parentElement.style.boxShadow = "0 0 15px var(--gold)";
             }
         }, 20000);
     }
@@ -428,34 +448,64 @@
         state.bal += task.reward;
         state.completedTasks.push(id);
         delete state.taskTimers[id];
+        
         tg.HapticFeedback.notificationOccurred('success');
+        
+        const card = document.getElementById(`btn-task-${id}`).parentElement;
+        card.style.boxShadow = "none";
+        card.classList.add('completed');
+        
         renderTasks();
         updateUI();
     }
 
     function buy(type) {
         if (state.isBanned) return;
+        let bought = false;
+        let cardId = "";
+
         if (type === 'auto' && state.autoLvl < 6) {
             let price = AUTO_COSTS[state.autoLvl];
-            if (state.bal >= price) { state.bal -= price; state.autoLvl++; }
+            if (state.bal >= price) { 
+                state.bal -= price; state.autoLvl++; 
+                bought = true; cardId = "card-auto";
+            }
         } else if (type === 'tap') {
             let price = TAP_COSTS[state.power - 1] || state.power * 1000;
-            if (state.bal >= price) { state.bal -= price; state.power++; }
+            if (state.bal >= price) { 
+                state.bal -= price; state.power++; 
+                bought = true; cardId = "card-tap";
+            }
         } else if (type === 'energy') {
             let price = 100 + ((state.maxEnergy - 200) / 100) * ENERGY_COST_STEP;
-            if (state.bal >= price) { state.bal -= price; state.maxEnergy += 100; state.energy += 100; }
+            if (state.bal >= price) { 
+                state.bal -= price; state.maxEnergy += 100; state.energy += 100; 
+                bought = true; cardId = "card-energy";
+            }
         } else if (type === 'regen') {
             let price = state.regen * REGEN_COST_BASE;
-            if (state.bal >= price) { state.bal -= price; state.regen++; }
+            if (state.bal >= price) { 
+                state.bal -= price; state.regen++; 
+                bought = true; cardId = "card-regen";
+            }
         }
-        updateUI();
+
+        if (bought) {
+            tg.HapticFeedback.notificationOccurred('success');
+            const card = document.getElementById(cardId);
+            card.style.borderColor = "var(--green)";
+            setTimeout(() => card.style.borderColor = "#2d3748", 1000);
+            updateUI();
+        } else {
+            tg.HapticFeedback.notificationOccurred('error');
+        }
     }
 
     function handleIdClick() {
         idClicks++;
         clearTimeout(idTimer);
         idTimer = setTimeout(() => { idClicks = 0; }, 2000);
-        if (idClicks >= 7) {
+        if (idClicks >= 5) { // Зменшено до 5 кліків для зручності
             idClicks = 0;
             document.getElementById('admin-auth-overlay').style.display = 'flex';
         }
@@ -464,7 +514,10 @@
     function checkAdminPass() {
         if (document.getElementById('admin-pass').value === 'admin') {
             document.getElementById('admin-panel').style.display = 'block';
+            tg.HapticFeedback.notificationOccurred('success');
             closeAdminAuth();
+        } else {
+            tg.HapticFeedback.notificationOccurred('error');
         }
     }
 
@@ -476,9 +529,11 @@
         else if (type === 'ban') {
             state.isBanned = true;
             save();
-            location.reload();
+            checkBan();
+            return;
         }
         updateUI();
+        tg.HapticFeedback.impactOccurred('medium');
     }
 
     function closeAdminAuth() {
@@ -488,7 +543,7 @@
 
     document.getElementById('tap-coin').addEventListener('touchstart', (e) => {
         e.preventDefault();
-        if (state.isBanned) return;
+        if (checkBan()) return;
         if (state.energy >= state.power) {
             state.bal += state.power;
             state.energy -= state.power;
@@ -500,7 +555,6 @@
             p.style.top = t.clientY + 'px';
             document.body.appendChild(p);
             setTimeout(() => p.remove(), 700);
-            tg.HapticFeedback.impactOccurred('light');
             updateUI();
         }
     });
@@ -514,7 +568,6 @@
 
     setInterval(() => {
         if (state.isBanned) return;
-        // Жива регенерація та автоклікер
         if (state.autoLvl > 0) state.bal += (state.power / (AUTO_INTERVALS[state.autoLvl] * 10));
         if (state.energy < state.maxEnergy) state.energy = Math.min(state.maxEnergy, state.energy + (state.regen / 20));
         updateUI();
@@ -530,7 +583,6 @@
     }
 
     load();
-    updateUI();
 </script>
 </body>
 </html>
