@@ -284,8 +284,8 @@
     const AUTO_INTERVALS = [0, 5, 4, 3, 2, 1, 0.5];
     const AUTO_COSTS = [1000, 7000, 20000, 65000, 150000, 400000];
     const TAP_COSTS = [100, 250, 400, 700, 1000, 1250, 2000, 5000];
-    const ENERGY_COST_STEP = 150;
-    const REGEN_COST_BASE = 200;
+    const ENERGY_COST_STEP = 400;
+    const REGEN_COST_BASE = 500;
 
     const TASKS_DATA = [
         { id: 1, text: "Приєднатися до тгк", link: "https://t.me/capuchinor", reward: 4000 },
@@ -306,7 +306,7 @@
         autoLvl: 0,
         gameId: null,
         isBanned: false,
-        userName: "Гість",
+        userName: "Гравець",
         lastTime: Date.now(),
         completedTasks: [],
         taskTimers: {}
@@ -586,4 +586,3 @@
 </script>
 </body>
 </html>
-
