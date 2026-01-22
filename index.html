@@ -62,7 +62,7 @@
             background: rgba(56, 189, 248, 0.1); padding: 4px 12px; border-radius: 20px;
         }
 
-        .content { flex-grow: 1; overflow-y: auto; padding-bottom: 100px; }
+        .content { flex-grow: 1; overflow-y: auto; padding-bottom: 120px; }
         .tab-content { display: none; padding: 0 20px; animation: slideUp 0.3s ease; }
         .tab-content.active { display: block; }
         @keyframes slideUp { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
@@ -86,10 +86,12 @@
         }
         .card-info h4 { margin: 0; font-size: 15px; }
         .card-info p { margin: 3px 0 0; font-size: 11px; color: var(--gray); }
-        .btn-upgrade {
+        .btn-upgrade, .btn-task {
             background: var(--tg-blue); color: white; border: none;
             padding: 10px 12px; border-radius: 10px; font-weight: bold; min-width: 80px;
         }
+        .btn-task.loading { background: #334155; cursor: wait; }
+        .btn-task.completed { background: #1e293b; color: var(--gray); cursor: default; }
 
         #ban-screen {
             position: fixed; inset: 0; background: #000; color: white;
@@ -97,7 +99,6 @@
             z-index: 10000; text-align: center; padding: 20px;
         }
         #ban-screen h1 { color: var(--red); font-size: 40px; margin-bottom: 10px; font-weight: 900; }
-        #ban-screen p { color: #ccc; font-size: 14px; }
 
         #admin-auth-overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,0.85);
@@ -123,8 +124,9 @@
         .nav {
             position: fixed; bottom: 0; width: 100%; display: flex;
             background: #111827; padding: 10px 0 25px; border-top: 1px solid #1e293b;
+            z-index: 100;
         }
-        .nav-item { flex: 1; text-align: center; font-size: 12px; color: #64748b; cursor: pointer; }
+        .nav-item { flex: 1; text-align: center; font-size: 10px; color: #64748b; cursor: pointer; padding-top: 5px; }
         .nav-item.active { color: var(--tg-blue); font-weight: bold; }
 
         .float-text {
@@ -175,11 +177,9 @@
                     <div id="p-income-text"></div>
                 </div>
             </div>
-
             <div class="tap-box">
                 <img src="https://telegram.org/img/t_logo.png" id="tap-coin" class="tg-coin">
             </div>
-
             <div class="stats-wrap">
                 <div style="display: flex; justify-content: space-between; font-size: 13px;">
                     <span>⚡ Енергія</span>
@@ -227,6 +227,11 @@
             </div>
         </div>
 
+        <div id="tab-tasks" class="tab-content">
+            <h3 style="margin: 20px 0 15px;">Завдання</h3>
+            <div id="task-list"></div>
+        </div>
+
         <div id="tab-profile" class="tab-content">
             <h3 style="margin: 20px 0 15px;">Кабінет гравця</h3>
             <div class="card" style="flex-direction: column; align-items: flex-start; gap: 12px; padding: 20px;">
@@ -239,7 +244,6 @@
                     <span id="p-game-id" style="font-family:monospace; color:var(--gold); cursor:pointer" onclick="handleIdClick()">#---</span>
                 </div>
             </div>
-
             <div id="admin-panel" class="admin-panel">
                 <h4 style="margin: 0 0 10px; color: var(--gold); text-align: center;">⚙️ Панель Управління</h4>
                 <input type="number" id="admin-amount" class="admin-input" style="width: 90%; font-size: 14px; padding: 10px;" placeholder="Сума...">
@@ -254,8 +258,9 @@
     </div>
 
     <div class="nav">
-        <div class="nav-item active" onclick="showTab('main', this)">🏠 Основна</div>
+        <div class="nav-item active" onclick="showTab('main', this)">🏠 Гра</div>
         <div class="nav-item" onclick="showTab('upgrades', this)">🚀 Апгрейди</div>
+        <div class="nav-item" onclick="showTab('tasks', this)">📋 Завдання</div>
         <div class="nav-item" onclick="showTab('profile', this)">👤 Профіль</div>
     </div>
 </div>
@@ -271,6 +276,16 @@
     const ENERGY_COST_STEP = 150;
     const REGEN_COST_BASE = 200;
 
+    const TASKS_DATA = [
+        { id: 1, text: "Приєднатися до тгк", link: "https://t.me/capuchinor", reward: 4000 },
+        { id: 2, text: "Приєднатися до тгк", link: "https://t.me/jockeeua", reward: 5000 },
+        { id: 3, text: "Запустити бота", link: "https://t.me/notcoin_bot", reward: 2000 },
+        { id: 4, text: "Запустити бота", link: "https://t.me/tribute", reward: 2000 },
+        { id: 5, text: "Запустити бота", link: "https://t.me/GiftsBattle_bot?start=_tgr_yfW0szM5N2Ri", reward: 2000 },
+        { id: 6, text: "Запустити бота", link: "https://t.me/tapswap_bot", reward: 2000 },
+        { id: 7, text: "Запустити бота", link: "https://t.me/usinfobot", reward: 2000 }
+    ];
+
     let state = {
         bal: 0,
         energy: 200,
@@ -281,31 +296,51 @@
         gameId: null,
         isBanned: false,
         userName: "Гість",
-        lastTime: Date.now()
+        lastTime: Date.now(),
+        completedTasks: [],
+        taskTimers: {}
     };
 
-    let idClicks = 0;
-    let idTimer = null;
-
     function getRank(bal) {
-        if (bal < 4000) return "Новачок";
-        if (bal < 15000) return "Досвідчений";
-        if (bal < 50000) return "Бізнесмен";
-        if (bal < 70000) return "Проф. Бізнесмен";
-        return "Власник";
+        if (bal < 10000) return "Новачок";
+        if (bal < 50000) return "Досвідчений";
+        if (bal < 200000) return "Магнат";
+        return "Імператор";
     }
 
     function load() {
-        const data = localStorage.getItem('star_empire_final_v9');
-        if (data) state = {...state, ...JSON.parse(data)};
+        const data = localStorage.getItem('star_empire_final_v10');
+        if (data) {
+            state = {...state, ...JSON.parse(data)};
+            calculateOffline();
+        }
         if (!state.gameId) state.gameId = Math.floor(100000 + Math.random() * 900000);
         if (state.isBanned) document.getElementById('ban-screen').style.display = 'flex';
+        renderTasks();
+    }
+
+    function calculateOffline() {
+        if (state.isBanned) return;
+        const now = Date.now();
+        const diffMs = now - state.lastTime;
+        const diffSec = diffMs / 1000;
+
+        // Автономна регенерація енергії
+        const regenPerSec = state.regen / 2; // 0.5 за 1lvl на сек
+        state.energy = Math.min(state.maxEnergy, state.energy + (diffSec * regenPerSec));
+
+        // Автономний автоклікер
+        if (state.autoLvl > 0) {
+            const interval = AUTO_INTERVALS[state.autoLvl];
+            const taps = Math.floor(diffSec / interval);
+            state.bal += (taps * state.power);
+        }
     }
 
     function save() {
         if (state.isBanned) return;
         state.lastTime = Date.now();
-        localStorage.setItem('star_empire_final_v9', JSON.stringify(state));
+        localStorage.setItem('star_empire_final_v10', JSON.stringify(state));
     }
 
     function updateUI() {
@@ -324,7 +359,6 @@
             inc.innerText = `🤖 Авто: +${state.power} кожні ${AUTO_INTERVALS[state.autoLvl]}с`;
         }
 
-        // Upgrades UI
         document.getElementById('lv-auto').innerText = state.autoLvl >= 6 ? 'MAX' : state.autoLvl;
         document.getElementById('cost-auto').innerText = state.autoLvl >= 6 ? '∞' : AUTO_COSTS[state.autoLvl];
         
@@ -337,6 +371,66 @@
         document.getElementById('cost-regen').innerText = state.regen * REGEN_COST_BASE;
         
         save();
+    }
+
+    function renderTasks() {
+        const container = document.getElementById('task-list');
+        container.innerHTML = '';
+        TASKS_DATA.forEach(task => {
+            const isCompleted = state.completedTasks.includes(task.id);
+            const timer = state.taskTimers[task.id];
+            const isRunning = timer && (Date.now() < timer);
+
+            const div = document.createElement('div');
+            div.className = 'card';
+            div.innerHTML = `
+                <div class="card-info">
+                    <h4>${task.text}</h4>
+                    <p style="color:var(--gold)">+${task.reward.toLocaleString()} 💰</p>
+                </div>
+                <button id="btn-task-${task.id}" class="btn-task ${isCompleted ? 'completed' : (isRunning ? 'loading' : '')}" 
+                        onclick="handleTask(${task.id})">
+                    ${isCompleted ? '✅' : (isRunning ? '⏳...' : 'Виконати')}
+                </button>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function handleTask(id) {
+        if (state.completedTasks.includes(id)) return;
+        const task = TASKS_DATA.find(t => t.id === id);
+        
+        if (state.taskTimers[id] && Date.now() < state.taskTimers[id]) {
+            tg.showAlert("Зачекайте, перевірка ще триває...");
+            return;
+        }
+
+        // Відкриваємо посилання
+        tg.openLink(task.link);
+
+        // Ставимо таймер на 20 секунд
+        state.taskTimers[id] = Date.now() + 20000;
+        renderTasks();
+
+        setTimeout(() => {
+            const btn = document.getElementById(`btn-task-${id}`);
+            if (btn) {
+                btn.innerText = "Забрати 💰";
+                btn.classList.remove('loading');
+                btn.onclick = () => claimTask(id);
+            }
+        }, 20000);
+    }
+
+    function claimTask(id) {
+        const task = TASKS_DATA.find(t => t.id === id);
+        state.bal += task.reward;
+        state.completedTasks.push(id);
+        delete state.taskTimers[id];
+        tg.HapticFeedback.notificationOccurred('success');
+        renderTasks();
+        updateUI();
     }
 
     function buy(type) {
@@ -420,6 +514,7 @@
 
     setInterval(() => {
         if (state.isBanned) return;
+        // Жива регенерація та автоклікер
         if (state.autoLvl > 0) state.bal += (state.power / (AUTO_INTERVALS[state.autoLvl] * 10));
         if (state.energy < state.maxEnergy) state.energy = Math.min(state.maxEnergy, state.energy + (state.regen / 20));
         updateUI();
