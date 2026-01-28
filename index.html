@@ -170,7 +170,7 @@
 
 <div id="ban-screen">
     <h1>ДОСТУП ОБМЕЖЕНО</h1>
-    <p>Ваш акаунт було заблоковано назавжди за порушення правил гри або спробу обману системи.</p>
+    <p>Ваш акаунт було заблоковано назавжди за порушення правил імперії або спробу обману системи.</p>
 </div>
 
 <div id="admin-auth-overlay">
@@ -303,8 +303,8 @@
     const AUTO_INTERVALS = [0, 5, 4, 3, 2, 1, 0.5];
     const AUTO_COSTS = [1000, 7000, 20000, 65000, 150000, 400000];
     const TAP_COSTS = [100, 250, 400, 700, 1000, 1250, 2000, 5000];
-    const ENERGY_COST_STEP = 600;
-    const REGEN_COST_BASE = 400;
+    const ENERGY_COST_STEP = 150;
+    const REGEN_COST_BASE = 200;
 
     const TASKS_DATA = [
         { id: 1, text: "Приєднатися до тгк", link: "https://t.me/capuchinor", reward: 4000 },
@@ -325,7 +325,7 @@
         autoLvl: 0,
         gameId: null,
         isBanned: false,
-        userName: "Lasser",
+        userName: "Гість",
         lastTime: Date.now(),
         completedTasks: [],
         taskTimers: {}
@@ -335,7 +335,7 @@
     let idTimer = null;
 
     function getRank(bal) {
-        if (bal < 5000) return "Новачок";
+        if (bal < 4000) return "Новачок";
         if (bal < 15000) return "Досвідчений";
         if (bal < 50000) return "Бізнесмен";
         if (bal < 70000) return "Проф. Бізнесмен";
@@ -623,5 +623,3 @@
 </script>
 </body>
 </html>
-
-
