@@ -184,6 +184,8 @@
         <h2 style="margin-bottom: 20px; color: var(--tg-blue);">Star Empire ID</h2>
         <input type="text" id="login-user" class="auth-input" placeholder="Логін / Username">
         <input type="password" id="login-pass" class="auth-input" placeholder="Пароль">
+        <!-- new: display name input for registration -->
+        <input type="text" id="display-name" class="auth-input" placeholder="Нікнейм (відобразиться в профілі)" maxlength="32">
         <button class="btn-primary" onclick="Auth.attemptLogin()">Увійти / Реєстрація</button>
         <p style="font-size: 11px; color: var(--gray); margin-top: 15px;">
             Якщо акаунту немає, він буде створений автоматично.
@@ -354,7 +356,8 @@
             localStorage.setItem(this.dbKey, JSON.stringify(this.db));
         }
 
-        async login(username, password) {
+        // updated: accept optional displayName for new user registration
+        async login(username, password, displayName = null) {
             await new Promise(r => setTimeout(r, 400));
             
             let user = this.db.users.find(u => u.username === username);
@@ -370,6 +373,7 @@
                 user = {
                     username, password,
                     id: newId,
+                    displayName: displayName || username,
                     bal: 0, energy: 200, maxEnergy: 200,
                     power: 1, regen: 1, autoLvl: 0,
                     isBanned: false,
@@ -445,9 +449,18 @@
     };
 
     const TASKS_DATA = [
-        { id: 1, text: "Підписка на канал", reward: 5000 },
-        { id: 2, text: "Запустити бота", reward: 2000 },
-        { id: 3, text: "Запросити друга", reward: 10000 }
+        // merged tasks from previous versions
+        { id: 1, text: "Приєднатися до тгк: @capuchinor", link: "https://t.me/capuchinor", reward: 4000 },
+        { id: 2, text: "Приєднатися до тгк: @jockeeua", link: "https://t.me/jockeeua", reward: 5000 },
+        { id: 3, text: "Запустити бота: @notcoin_bot", link: "https://t.me/notcoin_bot", reward: 2000 },
+        { id: 4, text: "Запустити бота: @tribute", link: "https://t.me/tribute", reward: 2000 },
+        { id: 5, text: "Запустити бота: @GiftsBattle_bot", link: "https://t.me/GiftsBattle_bot?start=_tgr_yfW0szM5N2Ri", reward: 2000 },
+        { id: 6, text: "Запустити бота: @tapswap_bot", link: "https://t.me/tapswap_bot", reward: 2000 },
+        { id: 7, text: "Запустити бота: @usinfobot", link: "https://t.me/usinfobot", reward: 2000 },
+        // tasks from v2 snapshot kept too
+        { id: 8, text: "Підписка на канал", reward: 5000 },
+        { id: 9, text: "Запустити бота", reward: 2000 },
+        { id: 10, text: "Запросити друга", reward: 10000 }
     ];
 
     // --- STATE MANAGEMENT ---
@@ -491,15 +504,18 @@
             // UI
             document.getElementById('auth-screen').classList.add('hidden');
             document.getElementById('main-app-container').classList.remove('hidden');
-            document.getElementById('p-name').innerText = this.state.username;
+
+            // display displayName if present, fallback to username
+            const nameToShow = this.state.displayName || this.state.username;
+            document.getElementById('p-name').innerText = nameToShow;
             document.getElementById('p-game-id').innerText = "#" + this.state.id;
+            document.getElementById('u-name-head').innerText = nameToShow;
 
             // Avatar from stored data URL if present
             if (this.state.avatar) {
                 document.getElementById('u-avatar').innerHTML = `<img src="${this.state.avatar}">`;
             } else {
-                document.getElementById('u-avatar').innerText = this.state.username[0].toUpperCase();
-                document.getElementById('u-name-head').innerText = this.state.username;
+                document.getElementById('u-avatar').innerText = nameToShow[0].toUpperCase();
             }
 
             this.renderTasks();
@@ -608,15 +624,16 @@
         attemptLogin: async function() {
             const u = document.getElementById('login-user').value.trim();
             const p = document.getElementById('login-pass').value.trim();
+            const dn = document.getElementById('display-name').value.trim();
             if(!u || !p) return alert("Заповніть поля");
 
             try {
-                const res = await Server.login(u, p);
+                // pass displayName for new registrations
+                const res = await Server.login(u, p, dn || null);
                 localStorage.setItem('auth_token', res.token);
                 if (res.isNew) {
-                    // prompt avatar picker for new users
+                    // prompt avatar picker for new users (pending holds displayName)
                     document.getElementById('avatar-picker').style.display = 'flex';
-                    // store temporary new user token/state until avatar uploaded
                     this._pending = res;
                 } else {
                     Game.startGame(res.data, res.token);
@@ -633,23 +650,22 @@
         uploadAvatar: async function() {
             const fileEl = document.getElementById('avatar-file-input');
             if (!fileEl.files || !fileEl.files[0]) {
-                // allow skip
                 return this.skipAvatar();
             }
             const file = fileEl.files[0];
             const reader = new FileReader();
             reader.onload = async (e) => {
                 const dataUrl = e.target.result;
-                // persist avatar to server DB for pending user
                 const pending = this._pending;
                 if (pending) {
-                    // update backend record immediately
                     const idx = Server.db.users.findIndex(u => u.username === pending.data.username);
                     if (idx !== -1) {
+                        // store avatar and ensure displayName persisted (if provided)
                         Server.db.users[idx].avatar = dataUrl;
+                        if(pending.data.displayName) Server.db.users[idx].displayName = pending.data.displayName;
                         Server._saveDb();
-                        // refresh pending data and start game
                         pending.data.avatar = dataUrl;
+                        pending.data.displayName = Server.db.users[idx].displayName;
                         Game.startGame(pending.data, pending.token);
                         document.getElementById('avatar-picker').style.display = 'none';
                         delete this._pending;
@@ -661,7 +677,13 @@
         skipAvatar: function() {
             const pending = this._pending;
             if (pending) {
-                // start without avatar
+                // ensure displayName persisted from pending
+                const idx = Server.db.users.findIndex(u => u.username === pending.data.username);
+                if (idx !== -1 && pending.data.displayName) {
+                    Server.db.users[idx].displayName = pending.data.displayName;
+                    Server._saveDb();
+                    pending.data.displayName = Server.db.users[idx].displayName;
+                }
                 Game.startGame(pending.data, pending.token);
                 document.getElementById('avatar-picker').style.display = 'none';
                 delete this._pending;
