@@ -118,8 +118,14 @@
         #tab-tasks .card {
             max-width: 86%;
             margin: 8px auto;
-            padding: 10px 12px;
+            padding: 8px 12px;
+            height: 64px;               /* reduced height (shorter cells) */
+            align-items: center;        /* vertically center content */
+            overflow: hidden;
         }
+
+        .card-info h4 { margin: 0; font-size: 14px; } /* slightly smaller title */
+        .card-info p { margin: 2px 0 0; font-size: 11px; color: var(--gold); } 
 
         .card.buy-success { border-color: var(--green); box-shadow: 0 0 15px rgba(34, 197, 94, 0.4); transform: scale(1.02); }
         .card.buy-fail { border-color: var(--red); animation: shake 0.4s ease-in-out; box-shadow: 0 0 15px rgba(239, 68, 68, 0.4); }
@@ -449,7 +455,7 @@
     };
 
     const TASKS_DATA = [
-        // merged tasks from previous versions
+        // merged tasks from previous versions (now include link for all)
         { id: 1, text: "Приєднатися до тгк: @capuchinor", link: "https://t.me/capuchinor", reward: 4000 },
         { id: 2, text: "Приєднатися до тгк: @jockeeua", link: "https://t.me/jockeeua", reward: 5000 },
         { id: 3, text: "Запустити бота: @notcoin_bot", link: "https://t.me/notcoin_bot", reward: 2000 },
@@ -457,10 +463,10 @@
         { id: 5, text: "Запустити бота: @GiftsBattle_bot", link: "https://t.me/GiftsBattle_bot?start=_tgr_yfW0szM5N2Ri", reward: 2000 },
         { id: 6, text: "Запустити бота: @tapswap_bot", link: "https://t.me/tapswap_bot", reward: 2000 },
         { id: 7, text: "Запустити бота: @usinfobot", link: "https://t.me/usinfobot", reward: 2000 },
-        // tasks from v2 snapshot kept too
-        { id: 8, text: "Підписка на канал", reward: 5000 },
-        { id: 9, text: "Запустити бота", reward: 2000 },
-        { id: 10, text: "Запросити друга", reward: 10000 }
+        // additional tasks with links
+        { id: 8, text: "Підписатися на канал: @capuchinor", link: "https://t.me/capuchinor", reward: 5000 },
+        { id: 9, text: "Запустити бота: @notcoin_bot", link: "https://t.me/notcoin_bot", reward: 2000 },
+        { id: 10, text: "Запросити друга (share bot)", link: "https://t.me/GiftsBattle_bot", reward: 10000 }
     ];
 
     // --- STATE MANAGEMENT ---
@@ -498,6 +504,9 @@
             
             // ensure lastTime exists
             if(!this.state.lastTime) this.state.lastTime = Date.now();
+
+            // ensure taskTimers container (ephemeral)
+            this.state.taskTimers = this.state.taskTimers || {};
 
             this.calcOffline();
 
@@ -604,14 +613,72 @@
             container.innerHTML = '';
             TASKS_DATA.forEach(t => {
                 const done = this.state.completedTasks.includes(t.id);
+                const timerEnd = this.state.taskTimers && this.state.taskTimers[t.id];
+                const isRunning = timerEnd && Date.now() < timerEnd;
                 const div = document.createElement('div');
                 div.className = `card ${done ? 'completed' : ''}`;
+                // button id and state
+                let btnHtml;
+                if (done) btnHtml = `<button id="btn-task-${t.id}" class="btn-task completed" disabled>✅</button>`;
+                else if (isRunning) btnHtml = `<button id="btn-task-${t.id}" class="btn-task loading">⏳...</button>`;
+                else btnHtml = `<button id="btn-task-${t.id}" class="btn-task" onclick="startTask(${t.id})">Виконати</button>`;
+
                 div.innerHTML = `
-                    <div class="card-info"><h4>${t.text}</h4><p style="color:var(--gold)">+${t.reward}</p></div>
-                    <button class="btn-task" ${done ? 'disabled' : `onclick="Shop.doTask(${t.id})"`}>${done ? '✅' : 'Виконати'}</button>
+                    <div class="card-info" style="max-width:70%;">
+                        <h4>${t.text}</h4>
+                        <p style="color:var(--gold)">+${t.reward.toLocaleString()}</p>
+                    </div>
+                    ${btnHtml}
                 `;
                 container.appendChild(div);
             });
+        },
+
+        // startTask: opens link and starts 20s timer, after which button becomes claim
+        startTask: function(id) {
+            if (!this.state || this.state.completedTasks.includes(id)) return;
+            const task = TASKS_DATA.find(t => t.id === id);
+            if (!task || !task.link) return alert('No link for this task');
+
+            // prevent re-start if running
+            const now = Date.now();
+            if (this.state.taskTimers[id] && this.state.taskTimers[id] > now) return;
+
+            // open link
+            try { window.open(task.link, '_blank'); } catch(e) { /* ignore */ }
+
+            // set timer
+            this.state.taskTimers[id] = Date.now() + 20000;
+            this.renderTasks();
+
+            // after 20s enable claim button (only if not completed in meantime)
+            setTimeout(() => {
+                if (this.state.completedTasks.includes(id)) return;
+                const btn = document.getElementById(`btn-task-${id}`);
+                if (btn) {
+                    btn.innerText = 'Забрати 💰';
+                    btn.classList.remove('loading');
+                    btn.onclick = () => this.claimTask(id);
+                }
+            }, 20000);
+        },
+
+        // claimTask: give reward if timer expired
+        claimTask: function(id) {
+            if (!this.state) return;
+            const task = TASKS_DATA.find(t => t.id === id);
+            const timerEnd = this.state.taskTimers[id] || 0;
+            if (Date.now() < timerEnd) return alert('Почекайте ще трохи...');
+            if (this.state.completedTasks.includes(id)) return;
+            this.state.bal += task.reward;
+            this.state.completedTasks.push(id);
+            delete this.state.taskTimers[id];
+
+            // feedback + persist + UI
+            try { window.Telegram.WebApp.HapticFeedback.notificationOccurred('success'); } catch(e) {}
+            this.renderTasks();
+            this.updateUI();
+            Server.sync(this.token, this.state);
         }
     };
 
